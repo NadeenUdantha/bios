@@ -1,0 +1,117 @@
+This is the commented source code for 80286 BIOS subsystems. 
+The comments are very detailed.
+
+In the portions of code shown below there's a nice example of how to
+program the 8259 PIC in master and slave configuration, using IN and OUT
+assembly instructions.
+
+Obviously all the chipset programming is done via IN/OUT commands using the
+well known ports of each chip.
+
+The code is divided in the following files:
+
+-  7.658 bios.asm     (BIOS ROUTINES INT12, INT11, INT02)
+- 42.653 bios1.asm    (INTERRUPT 15H BIOS ROUTINES)
+- 22.619 bios2.asm    (BIOS INTERRUPT ROUTINES INT1A, INT70, INT5, INT8)
+- 37.783 disk.asm     (FIXED DISK BIOS INT13)
+- 71.110 diskette.asm (DISKETTE BIOS INT13)
+-  8.019 dseg.inc     (DATA SEGMENT LOCATIONS, KB/DSK/VIDEO DATA AREAS)
+- 29.894 keybd.asm    (KEYBOARD BIOS INT16, INT9)
+-  7.421 modref.inc   (BIOS I/O INTERFACE)
+- 33.873 orgs.asm     (COMPATIBILITY MODULE)
+- 13.499 postequ.inc  (EQUATES USED BY POST AND BIOS)
+-  5.426 printer.asm  (PRINTER ADAPTER BIOS INT17)
+-  8.467 rs232.asm    (COMMUNICATIONS BIOS RS232 INT14)
+-  3.391 sysdata.inc  (PROTECTED MODE EQU FOR POST TESTS AND BIOS ROUTINES)
+- 67.611 test1.asm    (POST TEST.1 THROUGH TEST.16)
+- 55.747 test2.asm    (POST TEST.17 THROUGH TEST.22)
+- 17.368 test3.asm    (POST EXCEPTION INTERRUPT TESTS)
+- 23.376 test4.asm    (POST AND BIOS UTILITY ROUTINES)
+- 16.419 test5.asm    (EXCEPTTON INTERRUPT TEST HANDLERS FOR POST TESTS)
+- 12.491 test6.asm    (POST TESTS AND SYSTEM BOOTSTRAP)
+- 61.354 video.asm    (VIDEO DISPLAY BIOS INT10)
+
+
+An example of the code contained in these source files is here:
+
+;-----------------------------------------------------------------------------
+; REINITIALIZE THE 8259 INTERRUPT CONTROLLER #1 TO THE USER SPECIFIED OFFSET
+;-----------------------------------------------------------------------------
+
+MOV AL,11H ; START INITIALIZATION SEQUENCE-ICWI
+OUT INTA00,AL ; EDGE,INTERVAL-8,MASTER,ICW4 NEEDED
+JMP $+2
+MOV AL,BH ; HARDWARE INT'S START AT INT # (BL)
+OUT INTA01,AL ; SEND ICW2
+JMP $+2
+MOV AL,04H ; SEND ICW3 - MASTER LEVEL 2
+OUT INTA01,AL
+JMP $+2
+MOV AL,01H ; SEND ICW4 - MASTER,8086 MODE
+OUT INTA01,AL
+JMP $+2
+MOV AL,0FFH ; MASK OFF ALL INTERRUPTS
+OUT INTA01,AL
+
+;-----------------------------------------------------------------------------
+; REINITIALIZE THE 8259 INTERRUPT CONTROLLER #2 TO THE USER SPECIFIED OFFSET
+;-----------------------------------------------------------------------------
+
+MOV AL,11H ; INITIALIZE SEQUENCE-ICW1 FOR SLAVE
+OUT INTB00,AL ; EDGE,INTERVAL-8,MASTER,ICW4 NEEDED
+JMP $+2
+MOV AL,BL ; HARDWARE INT'S START AT INT # (BL)
+OUT INTB01,AL ; SEND ICW2
+MOV AL,02H
+JMP $+2
+OUT INTB01,AL ; SEND ICW3 - SLAVE LEVEL 2
+JMP $+2
+MOV AL,01H
+OUT INTB01,AL ; SEND ICW4 - SLAVE,8086 MODE
+JMP $+2
+MOV AL,0FFH
+OUT INTB01,AL ; MASK OFF ALL INTERRUPTS
+
+;------------------------------------------
+; SETUP BIOS CODE SEGMENT DESCRIPTOR :
+;------------------------------------------
+
+MOV [SI].BIO_CS.SEG_LIMIT,MAX_SEG_LEN ; SET LENGTH
+MOV [SI].BIO_CS.BASE_HI_WORD,CSEG@_HI ; HIGH WORD OF (CS)=0F
+MOV [SI].BIO_CS.BASE_LO_BYTE,CSEG@_LO ; LOW BYTE OF (CS)= 0
+MOV [SI].BIO_CS.DATA_ACC_RIGHTS,CPL0_CODE_ACCESS
+MOV [SI].BIO_CS.DATA_RESERVED,0 ; ZERO RESERVED AREA
+
+;------------------------------------------
+; ENABLE PROTECTED MODE  :
+;------------------------------------------
+
+LGDT [SI],GDTPTR ; LOAD GLOBAL DESCRIPTOR TABLE REGISTER
+DB 00FH
+??0005 LABEL BYTE
+MOV DX,WORD PTR [SI].GDTPTR
+??0006 LABEL  BYTE
+ORG OFFSET CS:??0005
+DB 001H
+ORG OFFSET CS:??0006
+LIDT [SI].IDTPTR ; INTERRUPT DESCRIPTOR TABLE REGISTER
+DB 00FH
+??0007 LABEL BYTE
+MOV BX,WORD PTA [SI].IDTPTR
+??0008 LABEL  BYTE
+ORG OFFSET CS:??0007
+DB 001H
+ORG OFFSET CS:??0008
+
+MOV AX,VIRTUAL_ENABLE ; MACHINE STATUS WORD NEEDED TO
+LMSW AX ;  SWITCH TO VIRTUAL MODE
+DB 00FH,001H,0F0H
+DB 0EAH ; PURGE PRE-FETCH QUEUE WITH FAR JUMP
+DW OFFSET VMODE ;  - TO OFFSET
+DW BIO_CS ;  - IN SEGMENT -PROTECTED MODE SEL.
+
+
+(*** download for full text ***)
+
+
+Read more:http://www.intel-assembler.it/portale/5/ibm-at-286-souce-code/ibm-at-286-souce-code.asp#ixzz4AQVPBCQL
